@@ -1,0 +1,6 @@
+{
+  "extends": "hrundel/node",
+  "rules": {
+    "no-invalid-this": 0
+  }
+}
