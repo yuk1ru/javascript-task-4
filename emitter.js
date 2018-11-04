@@ -4,7 +4,7 @@
  * Сделано задание на звездочку
  * Реализованы методы several и through
  */
-const isStar = true;
+const isStar = false;
 
 /**
  * Возвращает новый emitter
@@ -19,6 +19,8 @@ function getEmitter() {
          * @param {String} event
          * @param {Object} context
          * @param {Function} handler
+         * @param {Number?} times
+         * @param {Number?} frequency
          * @returns {this}
          */
         on: function (event, context, handler) {
@@ -42,10 +44,11 @@ function getEmitter() {
          * @returns {this}
          */
         off: function (event, context) {
-            const eventFilter = e =>
-                e === event || e.startsWith(`${event}.`);
+            const eventFilter = eventName =>
+                eventName === event || eventName.startsWith(event + '.');
             const eventsToOff = [...this.events.keys()].filter(eventFilter);
-            eventsToOff.forEach(e => this.events.get(e).delete(context));
+            eventsToOff.map(eventName => this.events.get(eventName))
+                .forEach(contextMapping => contextMapping.delete(context));
 
             return this;
         },
@@ -58,9 +61,8 @@ function getEmitter() {
         emit: function (event) {
             const eventsToEmit = event.split('.').reduceRight((acc, _, i, arr) =>
                 acc.concat(arr.slice(0, i + 1).join('.')), []);
-
-            eventsToEmit.map(e => this.events.get(e))
-                .filter(e => Boolean(e))
+            eventsToEmit.filter(eventName => this.events.has(eventName))
+                .map(eventName => this.events.get(eventName))
                 .forEach(eventMapping =>
                     eventMapping.forEach((handlers, context) =>
                         handlers.forEach(handler => handler.call(context))));
