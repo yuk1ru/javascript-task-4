@@ -63,6 +63,9 @@ function getEmitter() {
             return this;
         },
 
+        _isSuitableEventName: (eventName, event) =>
+            eventName === event || eventName.startsWith(event + '.'),
+
         /**
          * Отписаться от события
          * @param {String} event
@@ -70,16 +73,9 @@ function getEmitter() {
          * @returns {this}
          */
         off: function (event, context) {
-            const isSuitableEvent = eventName =>
-                eventName === event || eventName.startsWith(event + '.');
-
-            const eventNames = [...this._events.keys()];
-
             const contextMappings = [];
-            for (let i = 0; i < eventNames.length; i++) {
-                const eventName = eventNames[i];
-
-                if (isSuitableEvent(eventNames[i])) {
+            for (const eventName of this._events.keys()) {
+                if (this._isSuitableEventName(eventName, event)) {
                     const contextMapping = this._events.get(eventName);
                     contextMappings.push(contextMapping);
                 }
@@ -87,6 +83,17 @@ function getEmitter() {
             contextMappings.forEach(map => map.delete(context));
 
             return this;
+        },
+
+        _callHandler: (eventHandler, context) => {
+            if (eventHandler.callCount < eventHandler.times &&
+                eventHandler.callCount % eventHandler.frequency === 0) {
+
+                eventHandler.function.call(context);
+                eventHandler.callCount++;
+            } else {
+                eventHandler.callCount++;
+            }
         },
 
         /**
@@ -98,21 +105,11 @@ function getEmitter() {
             const eventsToEmit = event.split('.').reduceRight((acc, _, i, arr) =>
                 acc.concat(arr.slice(0, i + 1).join('.')), []);
 
-            const callHandler = (eventHandler, context) => {
-                if (eventHandler.callCount < eventHandler.times &&
-                    eventHandler.callCount % eventHandler.frequency === 0) {
-
-                    eventHandler.function.call(context);
-                    eventHandler.callCount++;
-                } else {
-                    eventHandler.callCount++;
-                }
-            };
             eventsToEmit.filter(eventName => this._events.has(eventName))
                 .map(eventName => this._events.get(eventName))
                 .forEach(eventMapping =>
                     eventMapping.forEach((handlers, context) =>
-                        handlers.forEach(handler => callHandler(handler, context))));
+                        handlers.forEach(handler => this._callHandler(handler, context))));
 
             return this;
         },
