@@ -12,23 +12,20 @@ const isStar = true;
  */
 function getEmitter() {
     return {
-        events: new Map(),
+        _events: new Map(),
 
         /**
-         * Подписаться на событие
+         * Обобщённая функция подписки на события
          * @param {String} event
          * @param {Object} context
          * @param {Function} handler
-         * @param {Number?} times
-         * @param {Number?} frequency
-         * @returns {this}
+         * @param {Array<Int>} timesAndFrequency - Дополнительные свойства (количество и частота)
          */
-        // eslint-disable-next-line max-params
-        on: function (event, context, handler, times = 0, frequency = 0) {
-            if (!this.events.has(event)) {
-                this.events.set(event, new Map());
+        _on: function (event, context, handler, [times = 0, frequency = 0]) {
+            if (!this._events.has(event)) {
+                this._events.set(event, new Map());
             }
-            const contextMapping = this.events.get(event);
+            const contextMapping = this._events.get(event);
 
             if (!contextMapping.has(context)) {
                 contextMapping.set(context, []);
@@ -38,16 +35,30 @@ function getEmitter() {
             if (times <= 0) {
                 times = Infinity;
             }
+
             if (frequency <= 0) {
                 frequency = 1;
             }
+
             const eventHandler = {
                 function: handler,
                 times,
                 frequency,
                 callCount: 0
             };
+
             eventHandlers.push(eventHandler);
+        },
+
+        /**
+         * Подписаться на событие
+         * @param {String} event
+         * @param {Object} context
+         * @param {Function} handler
+         * @returns {this}
+         */
+        on: function (event, context, handler) {
+            this._on(event, context, handler, []);
 
             return this;
         },
@@ -59,12 +70,21 @@ function getEmitter() {
          * @returns {this}
          */
         off: function (event, context) {
-            const eventFilter = eventName =>
+            const isSuitableEvent = eventName =>
                 eventName === event || eventName.startsWith(event + '.');
 
-            const eventsToOff = [...this.events.keys()].filter(eventFilter);
-            eventsToOff.map(eventName => this.events.get(eventName))
-                .forEach(contextMapping => contextMapping.delete(context));
+            const eventNames = [...this._events.keys()];
+
+            const contextMappings = [];
+            for (let i = 0; i < eventNames.length; i++) {
+                const eventName = eventNames[i];
+
+                if (isSuitableEvent(eventNames[i])) {
+                    const contextMapping = this._events.get(eventName);
+                    contextMappings.push(contextMapping);
+                }
+            }
+            contextMappings.forEach(map => map.delete(context));
 
             return this;
         },
@@ -88,8 +108,8 @@ function getEmitter() {
                     eventHandler.callCount++;
                 }
             };
-            eventsToEmit.filter(eventName => this.events.has(eventName))
-                .map(eventName => this.events.get(eventName))
+            eventsToEmit.filter(eventName => this._events.has(eventName))
+                .map(eventName => this._events.get(eventName))
                 .forEach(eventMapping =>
                     eventMapping.forEach((handlers, context) =>
                         handlers.forEach(handler => callHandler(handler, context))));
@@ -107,7 +127,7 @@ function getEmitter() {
          * @returns {this}
          */
         several: function (event, context, handler, times) {
-            this.on(event, context, handler, times);
+            this._on(event, context, handler, [times]);
 
             return this;
         },
@@ -122,7 +142,7 @@ function getEmitter() {
          * @returns {this}
          */
         through: function (event, context, handler, frequency) {
-            this.on(event, context, handler, undefined, frequency);
+            this._on(event, context, handler, [undefined, frequency]);
 
             return this;
         }
